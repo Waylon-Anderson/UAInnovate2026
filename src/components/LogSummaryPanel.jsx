@@ -156,9 +156,15 @@ export default function LogSummaryPanel({ data, open, onClose }) {
 
   // Build context once — regenerated whenever data changes
   const dataContext = buildDataContext(data);
+  const apiKey = import.meta.env.VITE_ANTHROPIC_KEY?.trim() || "";
 
   useEffect(() => {
-    if (open && messages.length === 0 && !thinking) runInitialSummary();
+    if (!open) {
+      setError("");
+      return;
+    }
+    if (messages.length === 0 && !thinking && apiKey) runInitialSummary();
+    if (messages.length === 0 && !apiKey) setError("Add VITE_ANTHROPIC_KEY to your .env file to use AI Log Summary.");
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -166,11 +172,16 @@ export default function LogSummaryPanel({ data, open, onClose }) {
   }, [messages, thinking]);
 
   async function callAPI(apiMessages) {
+    if (!apiKey) {
+      throw new Error(
+        "API key not set. Add VITE_ANTHROPIC_KEY to your .env file with your Anthropic API key to use AI Log Summary."
+      );
+    }
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": import.meta.env.VITE_ANTHROPIC_KEY || "",
+        "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
         "anthropic-dangerous-direct-browser-access": "true",
       },
