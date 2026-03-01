@@ -8,8 +8,8 @@ import SeverityFeed     from "./components/SeverityFeed";
 import TimelineChart    from "./components/TimelineChart";
 import KillChain        from "./components/KillChain";
 import LogExplorer      from "./components/LogExplorer";
-import AIVerdict        from "./components/AIVerdict";
 import SOARWorkbench    from "./components/SOARWorkbench";
+import LogSummaryPanel  from "./components/LogSummaryPanel";
 
 import { Shield, Radio, LayoutDashboard, Search, Bot, ClipboardList, ArrowRight } from "lucide-react";
 import "./App.css";
@@ -27,9 +27,8 @@ function incidentId(inc) {
 
 const TABS = [
   { id: "overview",    label: "1. Overview",    icon: LayoutDashboard, next: "investigate", nextLabel: "Start Investigation" },
-  { id: "investigate", label: "2. Investigate", icon: Search,          next: "ai",          nextLabel: "Generate AI Analysis" },
-  { id: "ai",          label: "3. AI Analysis", icon: Bot,             next: "soar",        nextLabel: "Open SOAR Workbench"  },
-  { id: "soar",        label: "4. SOAR",        icon: ClipboardList,   next: null,          nextLabel: null },
+  { id: "investigate", label: "2. Investigate", icon: Search,          next: "soar",        nextLabel: "Open SOAR Workbench"  },
+  { id: "soar",        label: "3. SOAR",        icon: ClipboardList,   next: null,          nextLabel: null },
 ];
 
 function StatPill({ label, value, color }) {
@@ -81,6 +80,7 @@ export default function App() {
   const [activeTab,        setActiveTab]        = useState("overview");
   const [logFilter,        setLogFilter]        = useState({ query: "", source: "all" });
   const [logFilterTrigger, setLogFilterTrigger] = useState(0);
+  const [summaryOpen,      setSummaryOpen]      = useState(false);
 
   // Shared SOAR case state — lifted so Overview reacts when cases are closed
   const [cases, setCases] = useState(loadCases);
@@ -224,6 +224,23 @@ export default function App() {
 
         {activeTab === "investigate" && (
           <>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "-8px" }}>
+              <button
+                onClick={() => setSummaryOpen(true)}
+                style={{
+                  background: "var(--blue-bg)", border: "1px solid var(--blue)",
+                  color: "var(--blue)", borderRadius: "5px", padding: "7px 16px",
+                  fontFamily: "'Rajdhani', sans-serif", fontSize: "12px", fontWeight: 700,
+                  letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: "7px", transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,136,255,0.2)"; e.currentTarget.style.boxShadow = "var(--blue-glow)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "var(--blue-bg)"; e.currentTarget.style.boxShadow = "none"; }}
+              >
+                <Bot size={13} />
+                AI Log Summary
+              </button>
+            </div>
             {openIncidents.length > 0 && (
               <KillChain data={data} onFilterSelect={handleKillChainFilter} />
             )}
@@ -233,11 +250,12 @@ export default function App() {
               externalFilter={logFilter}
               externalFilterTrigger={logFilterTrigger}
             />
+            <LogSummaryPanel
+              data={data}
+              open={summaryOpen}
+              onClose={() => setSummaryOpen(false)}
+            />
           </>
-        )}
-
-        {activeTab === "ai" && (
-          <AIVerdict incidents={incidents} data={data} />
         )}
 
         {activeTab === "soar" && (

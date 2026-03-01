@@ -5,6 +5,7 @@ import {
   User, Tag, FileText, Lock, Unlock, Filter
 } from "lucide-react";
 import { relativeTime, formatTimestamp } from "../utils/formatTime";
+import { sanitizeText, sanitizeMultiline, sanitizeTag } from "../utils/sanitize";
 
 // ── Verdict definitions ──────────────────────────────────────────────────────
 const VERDICTS = [
@@ -306,7 +307,7 @@ function CaseModal({ inc, caseData, onSave, onClose }) {
                 <div style={{ display: "flex", gap: "8px" }}>
                   <input
                     value={analyst}
-                    onChange={(e) => { setAnalyst(e.target.value); setNameTouched(true); }}
+                    onChange={(e) => { setAnalyst(sanitizeText(e.target.value, 100)); setNameTouched(true); }}
                     placeholder="Enter your name to begin working this alert..."
                     style={{
                       flex: 1, background: "var(--bg-secondary)",
@@ -416,7 +417,7 @@ function CaseModal({ inc, caseData, onSave, onClose }) {
                 </div>
                 <input
                   value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
+                  onChange={(e) => setTagInput(sanitizeTag(e.target.value, 50))}
                   onKeyDown={addTag}
                   placeholder="e.g. brute-force, external-ip, reviewed..."
                   style={{
@@ -436,7 +437,7 @@ function CaseModal({ inc, caseData, onSave, onClose }) {
                 </label>
                 <textarea
                   value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  onChange={(e) => setNotes(sanitizeMultiline(e.target.value, 4000))}
                   placeholder="Document your investigation steps, findings, and reasoning..."
                   rows={5}
                   style={{
@@ -468,7 +469,7 @@ function CaseModal({ inc, caseData, onSave, onClose }) {
                 </label>
                 <textarea
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => setDescription(sanitizeMultiline(e.target.value, 4000))}
                   placeholder={`Describe this alert in full detail.\n\nExample:\n- Why did this alert fire?\n- What systems or users are affected?\n- What is the potential impact?\n- What evidence supports or refutes this being a real threat?\n- Are there related alerts or prior incidents?`}
                   rows={14}
                   style={{

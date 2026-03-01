@@ -1,19 +1,34 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Search, X, ChevronDown, ChevronUp, Zap } from "lucide-react";
 import { formatTimestamp } from "../utils/formatTime";
+import { sanitizeQuery } from "../utils/sanitize";
 
-const SOURCE_LABELS = {
-  auth_logs:      "Auth",
-  dns_logs:       "DNS",
-  firewall_logs:  "Firewall",
-  malware_alerts: "Malware",
-};
+// Dynamically resolve label/color by keyword match so any filename variant works
+// e.g. "malware_alerts_1" → "Malware", "auth_logs_2" → "Auth"
+function getSourceLabel(key) {
+  const k = key.toLowerCase();
+  if (k.includes("malware")) return "Malware";
+  if (k.includes("auth"))    return "Auth";
+  if (k.includes("dns"))     return "DNS";
+  if (k.includes("firewall")) return "Firewall";
+  return key;
+}
 
-const SOURCE_COLORS = {
-  auth_logs:      "var(--blue)",
-  dns_logs:       "var(--cyan)",
-  firewall_logs:  "var(--yellow)",
-  malware_alerts: "var(--red)",
+function getSourceColor(key) {
+  const k = key.toLowerCase();
+  if (k.includes("malware"))  return "var(--red)";
+  if (k.includes("auth"))     return "var(--blue)";
+  if (k.includes("dns"))      return "var(--cyan)";
+  if (k.includes("firewall")) return "var(--yellow)";
+  return "var(--text-muted)";
+}
+
+// Source tab keys — canonical names used for filtering
+const SOURCE_TAB_KEYS = {
+  auth:     (key) => key.toLowerCase().includes("auth"),
+  dns:      (key) => key.toLowerCase().includes("dns"),
+  firewall: (key) => key.toLowerCase().includes("firewall"),
+  malware:  (key) => key.toLowerCase().includes("malware"),
 };
 
 const QUICK_FILTERS = [
@@ -85,7 +100,8 @@ export default function LogExplorer({ data, externalFilter, externalFilterTrigge
   const filtered = useMemo(() => {
     setPage(1);
     return allRows.filter((row) => {
-      const sourceMatch = activeSource === "all" || row._source === activeSource;
+      const sourceMatch = activeSource === "all" ||
+        (SOURCE_TAB_KEYS[activeSource] && SOURCE_TAB_KEYS[activeSource](row._source));
       const queryMatch  = rowMatchesQuery(row, query);
       return sourceMatch && queryMatch;
     });
@@ -126,7 +142,9 @@ export default function LogExplorer({ data, externalFilter, externalFilterTrigge
 
   const sourceCounts = useMemo(() => {
     const counts = { all: allRows.length };
-    Object.keys(SOURCE_LABELS).forEach((s) => { counts[s] = allRows.filter((r) => r._source === s).length; });
+    Object.entries(SOURCE_TAB_KEYS).forEach(([cat, matchFn]) => {
+      counts[cat] = allRows.filter((r) => matchFn(r._source)).length;
+    });
     return counts;
   }, [allRows]);
 
@@ -176,7 +194,7 @@ export default function LogExplorer({ data, externalFilter, externalFilterTrigge
           <input
             type="text"
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+            onChange={(e) => { setQuery(sanitizeQuery(e.target.value)); setPage(1); }}
             placeholder="Search by IP, user, domain, action..."
             style={{
               width: "100%", background: "var(--bg-secondary)",
@@ -196,9 +214,8 @@ export default function LogExplorer({ data, externalFilter, externalFilterTrigge
         </div>
 
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-          {[["all", "All"], ...Object.entries(SOURCE_LABELS)].map(([key, label]) => {
+          {[["all", "All", "var(--blue)"], ...Object.keys(SOURCE_TAB_KEYS).map((k) => [k, getSourceLabel(k), getSourceColor(k)])].map(([key, label, color]) => {
             const isActive = activeSource === key;
-            const color    = key === "all" ? "var(--blue)" : SOURCE_COLORS[key];
             return (
               <button key={key} onClick={() => { setActiveSource(key); setPage(1); }}
                 style={{
@@ -252,7 +269,7 @@ export default function LogExplorer({ data, externalFilter, externalFilterTrigge
             )}
             {paginated.map((row, i) => {
               const isExpanded = expandedRow === i;
-              const srcColor   = SOURCE_COLORS[row._source] || "var(--text-muted)";
+              const srcColor   = getSourceColor(row._source);
               return (
                 <>
                   <tr key={i}
@@ -263,7 +280,7 @@ export default function LogExplorer({ data, externalFilter, externalFilterTrigge
                   >
                     <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}>
                       <span className="badge" style={{ background: `color-mix(in srgb, ${srcColor} 15%, transparent)`, color: srcColor, border: `1px solid color-mix(in srgb, ${srcColor} 35%, transparent)`, fontSize: "10px" }}>
-                        {SOURCE_LABELS[row._source]}
+                        {getSourceLabel(row._source)}
                       </span>
                     </td>
                     {columns.map((col) => {
