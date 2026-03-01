@@ -85,7 +85,7 @@ export default function TimelineChart({ data }) {
       </div>
 
       <ResponsiveContainer width="100%" height={230}>
-        <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
+        <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="time"
@@ -98,6 +98,7 @@ export default function TimelineChart({ data }) {
             tick={{ fill: "var(--text-muted)", fontSize: 10, fontFamily: "'Share Tech Mono', monospace" }}
             tickLine={false}
             axisLine={false}
+            label={{ value: "Events", angle: -90, position: "insideLeft", offset: 10, fill: "var(--text-muted)", fontSize: 10, fontFamily: "'Share Tech Mono', monospace" }}
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ fontSize: "11px", fontFamily: "'Rajdhani', sans-serif", paddingTop: "8px" }} />

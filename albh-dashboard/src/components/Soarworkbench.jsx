@@ -158,22 +158,39 @@ function CaseModal({ inc, caseData, onSave, onClose }) {
   const [nameTouched, setNameTouched] = useState(false);
 
   const selectedVerdict = VERDICTS.find((v) => v.id === verdict);
-
-  // An analyst name is required before ANY progress can be saved
   const isLocked = !analyst.trim();
+
+  function addAuditEntry(existing, action) {
+    const log = existing || [];
+    return [...log, { ts: new Date().toISOString(), analyst: analyst.trim(), action }];
+  }
 
   function handleClaim() {
     if (isLocked) return;
     setClaimed(true);
+    const auditLog = addAuditEntry(caseData?.auditLog, "Claimed alert");
     onSave(id, {
       ...caseData,
       analyst,
       claimedAt: caseData?.claimedAt || new Date().toISOString(),
+      auditLog,
     });
   }
 
   function handleSave() {
     if (isLocked) { setNameTouched(true); return; }
+    const prevVerdict = caseData?.verdict;
+    const actions = [];
+    if (!caseData?.claimedAt && !claimed) actions.push("Saved progress");
+    if (verdict && verdict !== prevVerdict) actions.push(`Verdict set to ${VERDICTS.find((v) => v.id === verdict)?.label}`);
+    if (notes !== (caseData?.notes || "")) actions.push("Updated analyst notes");
+    if (description !== (caseData?.description || "")) actions.push("Updated description");
+    if (JSON.stringify(tags) !== JSON.stringify(caseData?.tags || [])) actions.push("Updated tags");
+
+    let auditLog = caseData?.auditLog || [];
+    actions.forEach((a) => { auditLog = addAuditEntry(auditLog, a); });
+    if (auditLog.length === 0) auditLog = addAuditEntry(auditLog, "Saved progress");
+
     onSave(id, {
       analyst,
       verdict,
@@ -182,6 +199,7 @@ function CaseModal({ inc, caseData, onSave, onClose }) {
       tags,
       claimedAt: caseData?.claimedAt || (claimed ? new Date().toISOString() : null),
       closedAt:  verdict ? new Date().toISOString() : null,
+      auditLog,
     });
     onClose();
   }
@@ -239,7 +257,7 @@ function CaseModal({ inc, caseData, onSave, onClose }) {
 
         {/* Pane tabs */}
         <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
-          {[["work", "Work Alert", ClipboardList], ["description", "Description", FileText]].map(([pane, label, Icon]) => (
+          {[["work", "Work Alert", ClipboardList], ["description", "Description", FileText], ["activity", "Activity Log", Clock]].map(([pane, label, Icon]) => (
             <button key={pane} onClick={() => setActivePane(pane)}
               style={{
                 background: "transparent", border: "none",
@@ -465,6 +483,48 @@ function CaseModal({ inc, caseData, onSave, onClose }) {
               </div>
             </>
           )}
+
+          {/* ── ACTIVITY LOG PANE ── */}
+          {activePane === "activity" && (
+            <>
+              <div style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "4px", padding: "10px 14px", marginBottom: "4px" }}>
+                <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                  Full chain of custody for this alert. Every action is timestamped and attributed.
+                </p>
+              </div>
+              {(!caseData?.auditLog || caseData.auditLog.length === 0) ? (
+                <div style={{ padding: "24px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px", fontFamily: "'Share Tech Mono', monospace" }}>
+                  No activity yet. Claim or save this alert to begin the log.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                  {[...caseData.auditLog].reverse().map((entry, i) => (
+                    <div key={i} style={{
+                      display: "flex", gap: "12px", padding: "10px 0",
+                      borderBottom: i < caseData.auditLog.length - 1 ? "1px solid var(--border)" : "none",
+                    }}>
+                      {/* Timeline dot */}
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, paddingTop: "3px" }}>
+                        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--blue)", flexShrink: 0 }} />
+                        {i < caseData.auditLog.length - 1 && (
+                          <div style={{ width: "1px", flex: 1, background: "var(--border)", marginTop: "4px" }} />
+                        )}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "2px" }}>
+                          {entry.action}
+                        </div>
+                        <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "'Share Tech Mono', monospace", display: "flex", gap: "10px" }}>
+                          <span>{formatTimestamp(entry.ts)}</span>
+                          {entry.analyst && <span style={{ color: "var(--blue)" }}>by {entry.analyst}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Modal footer */}
@@ -506,16 +566,14 @@ function CaseModal({ inc, caseData, onSave, onClose }) {
 }
 
 // ── Main SOAR Workbench ──────────────────────────────────────────────────────
-export default function SOARWorkbench({ incidents }) {
-  const [cases,       setCases]       = useState(loadCases);
-  const [openInc,     setOpenInc]     = useState(null);
-  const [filterState, setFilterState] = useState("all"); // all | open | in_progress | closed
-  const [filterVerdict, setFilterVerdict] = useState("all");
+export default function SOARWorkbench({ incidents, cases, onSaveCase }) {
+  const [openInc,        setOpenInc]        = useState(null);
+  const [filterState,    setFilterState]    = useState("all");
+  const [filterVerdict,  setFilterVerdict]  = useState("all");
+  const [filterSeverity, setFilterSeverity] = useState("all");
 
   function saveCase(id, caseData) {
-    const updated = { ...cases, [id]: caseData };
-    setCases(updated);
-    saveCases(updated);
+    onSaveCase(id, caseData);
   }
 
   function getState(inc) {
@@ -527,21 +585,25 @@ export default function SOARWorkbench({ incidents }) {
   }
 
   const filtered = incidents.filter((inc) => {
-    const state   = getState(inc);
-    const c       = cases[incidentId(inc)];
-    const verdict = c?.verdict || "none";
-
-    const stateMatch   = filterState   === "all" || filterState   === state;
-    const verdictMatch = filterVerdict === "all" || filterVerdict === verdict;
-    return stateMatch && verdictMatch;
+    const state    = getState(inc);
+    const c        = cases[incidentId(inc)];
+    const verdict  = c?.verdict || "none";
+    const stateMatch    = filterState    === "all" || filterState    === state;
+    const verdictMatch  = filterVerdict  === "all" || filterVerdict  === verdict;
+    const severityMatch = filterSeverity === "all" || inc.severity   === filterSeverity;
+    return stateMatch && verdictMatch && severityMatch;
   });
 
-  // Counts for filter bar
   const counts = {
     open:        incidents.filter((i) => getState(i) === "open").length,
     in_progress: incidents.filter((i) => getState(i) === "in_progress").length,
     closed:      incidents.filter((i) => getState(i) === "closed").length,
   };
+
+  const severityCounts = ["CRITICAL","HIGH","MEDIUM","LOW"].reduce((acc, s) => {
+    acc[s] = incidents.filter((i) => i.severity === s).length;
+    return acc;
+  }, {});
 
   const verdictCounts = VERDICTS.reduce((acc, v) => {
     acc[v.id] = incidents.filter((i) => cases[incidentId(i)]?.verdict === v.id).length;
@@ -616,6 +678,33 @@ export default function SOARWorkbench({ incidents }) {
                   transition: "all 0.15s",
                 }}
               >{v.label}{verdictCounts[v.id] > 0 ? ` (${verdictCounts[v.id]})` : ""}</button>
+            ))}
+          </div>
+
+          <div style={{ width: "1px", height: "20px", background: "var(--border)" }} />
+
+          {/* Severity filters */}
+          <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+            {[
+              ["all",      "All",      "var(--blue)",   "var(--blue)"],
+              ["CRITICAL", "Critical", "var(--red)",    "var(--red-bg)"],
+              ["HIGH",     "High",     "var(--yellow)", "var(--yellow-bg)"],
+              ["MEDIUM",   "Medium",   "var(--yellow)", "var(--yellow-bg)"],
+              ["LOW",      "Low",      "var(--green)",  "var(--green-bg)"],
+            ].map(([val, label, color, bg]) => (
+              <button key={val} onClick={() => setFilterSeverity(val)}
+                style={{
+                  background: filterSeverity === val ? bg : "transparent",
+                  border: `1px solid ${filterSeverity === val ? color : "var(--border)"}`,
+                  color: filterSeverity === val ? color : "var(--text-muted)",
+                  borderRadius: "3px", padding: "4px 10px", fontSize: "11px",
+                  fontFamily: "'Rajdhani', sans-serif", fontWeight: 600,
+                  letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                {label}{val !== "all" && severityCounts[val] > 0 ? ` (${severityCounts[val]})` : ""}
+              </button>
             ))}
           </div>
         </div>

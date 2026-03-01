@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Search, X, ChevronDown, ChevronUp, Zap } from "lucide-react";
 import { formatTimestamp } from "../utils/formatTime";
 
@@ -17,12 +17,12 @@ const SOURCE_COLORS = {
 };
 
 const QUICK_FILTERS = [
-  { label: "Failed Logins",       query: "Failed",          source: "auth_logs" },
-  { label: "External IPs",        query: "185.",            source: "all" },
-  { label: "Bad Domains",         query: "bad-actor",       source: "dns_logs" },
-  { label: "Blocked Traffic",     query: "Block",           source: "firewall_logs" },
-  { label: "Malware",             query: "Beacon",          source: "malware_alerts" },
-  { label: "Successful Logins",   query: "Success",         source: "auth_logs" },
+  { label: "Failed Logins",     query: "Failed",    source: "auth_logs" },
+  { label: "External IPs",      query: "185.",       source: "all" },
+  { label: "Bad Domains",       query: "bad-actor",  source: "dns_logs" },
+  { label: "Blocked Traffic",   query: "Block",      source: "firewall_logs" },
+  { label: "Malware",           query: "Beacon",     source: "malware_alerts" },
+  { label: "Successful Logins", query: "Success",    source: "auth_logs" },
 ];
 
 function rowMatchesQuery(row, query) {
@@ -49,13 +49,32 @@ function Highlight({ text, query }) {
 
 const PAGE_SIZE = 20;
 
-export default function LogExplorer({ data }) {
+export default function LogExplorer({ data, externalFilter, externalFilterTrigger }) {
   const [query,        setQuery]        = useState("");
   const [activeSource, setActiveSource] = useState("all");
   const [page,         setPage]         = useState(1);
   const [expandedRow,  setExpandedRow]  = useState(null);
   const [sortField,    setSortField]    = useState("timestamp");
   const [sortDir,      setSortDir]      = useState("desc");
+  const containerRef = useRef(null);
+
+  // Map partial keywords from KillChain to full source key names used by the tab buttons
+  const SOURCE_MAP = {
+    auth:     "auth_logs",
+    dns:      "dns_logs",
+    firewall: "firewall_logs",
+    malware:  "malware_alerts",
+  };
+
+  // Apply external filter (e.g. from Kill Chain "View in Log Explorer")
+  useEffect(() => {
+    if (!externalFilter || !externalFilterTrigger) return;
+    setQuery(externalFilter.query || "");
+    const normalized = SOURCE_MAP[externalFilter.source] || externalFilter.source || "all";
+    setActiveSource(normalized);
+    setPage(1);
+    setTimeout(() => containerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+  }, [externalFilterTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allRows = useMemo(() =>
     Object.entries(data).flatMap(([source, rows]) =>
@@ -112,7 +131,7 @@ export default function LogExplorer({ data }) {
   }, [allRows]);
 
   return (
-    <div className="card col-span-2">
+    <div className="card col-span-2" ref={containerRef}>
       <div className="card-title" style={{ marginBottom: "14px" }}>
         <Search size={14} />
         Log Explorer

@@ -40,6 +40,17 @@ export default function AIVerdict({ incidents, data = {} }) {
   const [error,    setError]    = useState("");
   const [copied,   setCopied]   = useState(false);
 
+  function downloadReport() {
+    const caseNum = `INC-${Date.now().toString(36).toUpperCase()}`;
+    const now     = new Date().toLocaleString();
+    const text    = `INCIDENT REPORT\nCase: ${caseNum}\nGenerated: ${now}\nSeverity: CRITICAL\n${"─".repeat(60)}\n\n${verdict}`;
+    const blob    = new Blob([text], { type: "text/plain" });
+    const url     = URL.createObjectURL(blob);
+    const a       = document.createElement("a");
+    a.href = url; a.download = `${caseNum}.txt`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function getVerdict() {
     setLoading(true);
     setError("");
@@ -134,6 +145,11 @@ export default function AIVerdict({ incidents, data = {} }) {
           {verdict && (
             <button className="btn-green btn" style={{ padding: "5px 14px", fontSize: "11px" }} onClick={copyReport}>
               {copied ? "✓ Copied" : "Copy Report"}
+            </button>
+          )}
+          {verdict && (
+            <button className="btn" style={{ padding: "5px 14px", fontSize: "11px" }} onClick={downloadReport}>
+              ↓ Download TXT
             </button>
           )}
           <button

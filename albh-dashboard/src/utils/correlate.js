@@ -1,4 +1,21 @@
-const BAD_DOMAINS = ["bad-actor", "phish", "malware", "c2", ".ru", ".xyz", ".tk", ".pw"];
+// Bad domain patterns — matched against the full domain string.
+// Rules:
+//   string starting with "." → matches as a TLD suffix (e.g. ".ru" only matches foo.ru, not "guru")
+//   otherwise → must match as a full segment separated by dots (e.g. "bad-actor" matches bad-actor.ru but NOT telemetry-bad-actorsomething.com)
+const BAD_DOMAIN_PATTERNS = ["bad-actor", "phish", "c2", ".ru", ".xyz", ".tk", ".pw", ".onion"];
+
+function isBadDomain(domain) {
+  if (!domain) return false;
+  const d = domain.toLowerCase();
+  return BAD_DOMAIN_PATTERNS.some((pattern) => {
+    if (pattern.startsWith(".")) {
+      // TLD match — domain must END with this suffix
+      return d.endsWith(pattern);
+    }
+    // Segment match — must appear as a full dot-delimited part
+    return d.split(".").includes(pattern) || d.includes("." + pattern + ".") || d.startsWith(pattern + ".");
+  });
+}
 const BRUTE_FORCE_THRESHOLD = 5;
 
 // Collects rows from every loaded file whose key contains the keyword.
@@ -55,8 +72,7 @@ export function correlateEvents(data) {
 
   // ── DNS: malicious domain queries ─────────────────────────────────────────
   dns_logs.forEach((r) => {
-    const domain = String(r.domain_queried || "").toLowerCase();
-    if (BAD_DOMAINS.some((d) => domain.includes(d))) {
+    if (isBadDomain(r.domain_queried)) {
       suspiciousIPs.add(r.client_ip);
       incidents.push({
         type:      "Malicious DNS",
@@ -70,30 +86,19 @@ export function correlateEvents(data) {
 
   // ── Malware: all files with "malware" in name ─────────────────────────────
   malware_alerts.forEach((r) => {
-    // Accept any row that has either hostname or threat_name populated
-    const host   = r.hostname   || r.host   || r.ip       || r.source_ip || "Unknown";
-    const threat = r.threat_name || r.threat || r.malware  || r.alert     || "Unknown Threat";
+    // Log columns on first row to help debug second file mismatches
+    if (malware_alerts.indexOf(r) === 0) {
+      console.log("[correlate] malware row columns:", Object.keys(r));
+    }
+    const host   = r.hostname   || r.host      || r.ip        || r.source_ip  || r.machine || r.device   || "Unknown";
+    const threat = r.threat_name || r.threat    || r.malware   || r.alert      || r.signature || r.detection || "Unknown Threat";
     incidents.push({
       type:      "Malware",
       ip:        host,
       detail:    threat,
       severity:  "CRITICAL",
-      timestamp: r.timestamp || r.time || null,
+      timestamp: r.timestamp || r.time || r.date || null,
     });
-  });
-
-  // ── Firewall: blocked connections ─────────────────────────────────────────
-  firewall_logs.forEach((r) => {
-    const action = String(r.action || "").toLowerCase();
-    if (action === "block" || action === "deny") {
-      incidents.push({
-        type:      "Firewall Block",
-        ip:        r.source_ip,
-        detail:    `→ ${r.destination_ip}:${r.destination_port}`,
-        severity:  "MEDIUM",
-        timestamp: r.timestamp,
-      });
-    }
   });
 
   // ── IP Threat Scoring ─────────────────────────────────────────────────────
@@ -111,8 +116,7 @@ export function correlateEvents(data) {
   });
 
   dns_logs.forEach((r) => {
-    const domain = String(r.domain_queried || "").toLowerCase();
-    if (BAD_DOMAINS.some((d) => domain.includes(d))) addScore(r.client_ip, 40);
+    if (isBadDomain(r.domain_queried)) addScore(r.client_ip, 40);
   });
 
   malware_alerts.forEach((r) => {

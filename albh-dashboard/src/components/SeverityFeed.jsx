@@ -26,7 +26,7 @@ export default function SeverityFeed({ incidents, limit }) {
   const criticalCount = incidents.filter((i) => i.severity === "CRITICAL").length;
 
   return (
-    <div className="card">
+    <div className="card col-span-2">
       <div className="card-title">
         <AlertTriangle size={14} />
         Active Incidents
