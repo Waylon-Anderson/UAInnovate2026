@@ -1,0 +1,11 @@
+{
+  "name": "albh-dashboard",
+  "private": true,
+  "description": "Run npm scripts from project root (UAInnovate2026). The app lives at repo root.",
+  "scripts": {
+    "dev": "npm run dev --prefix ..",
+    "build": "npm run build --prefix ..",
+    "preview": "npm run preview --prefix ..",
+    "lint": "npm run lint --prefix .."
+  }
+}
