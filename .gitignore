@@ -15,15 +15,6 @@ build/
 .env.development
 .env.production
 
-# ── Log data files — never commit sensitive log data ───────
-public/data/*.csv
-public/data/*.xlsx
-public/data/*.xls
-public/data/*.tsv
-public/data/*.json
-# Keep the data directory itself tracked (for README etc.)
-!public/data/.gitkeep
-
 # ── OS / editor artifacts ──────────────────────────────────
 .DS_Store
 Thumbs.db
